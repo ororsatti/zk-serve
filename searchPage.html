@@ -4,18 +4,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="resets.css">
+
+  <style rel="stylesheet" type="text/css">
+    * {
+      padding: 0;
+      margin: 0;
+    }
+
+    main {
+      width: 100%;
+      height: 100vh;
+
+      padding: 12px;
+    }
+  </style>
 </head>
 
 <body>
+
   <main>
-    <h2>{{dir}}</h2>
+    <h1>Results:</h1>
     <ul>
-      {{#each files}}
+      {{#each results}}
       <li><a href="{{this.path}}">{{this.name}}</a></li>
       {{/each}}
     </ul>
   </main>
 </body>
+
 
 </html>

@@ -4,6 +4,7 @@ import path from "path"
 import { format } from "date-fns"
 import showdown from "showdown"
 import Handlebars from "handlebars"
+import { match } from "assert"
 
 const app = express()
 const port = 3000
@@ -12,28 +13,34 @@ const root = "/Users/antonio/school/"
 const templateFile = fs.readFileSync(path.join(process.cwd(), "template.html"))
 const precomplied = Handlebars.compile(templateFile.toString("utf8"))
 
+const searchTemplateFile = fs.readFileSync(
+    path.join(process.cwd(), "searchPage.html")
+)
+const precompiledSearch = Handlebars.compile(
+    searchTemplateFile.toString("utf8")
+)
+
 const dirTemplateFile = fs.readFileSync(
     path.join(process.cwd(), "dirTemplate.html")
 )
 const precompliedDir = Handlebars.compile(dirTemplateFile.toString("utf8"))
 
-showdown.extension("wikilinks", function () {
+const test = showdown.extension("wikilinks", function () {
     return [
         {
             type: "lang",
-            regex: /\[\[(.*?)\]\]/g,
-            replace: (text, inner, opts) => {
+            regex: /\[\[([^\|\]]+)(?:\|(.*?))?\]\]/,
+            replace: (text, inner, displayName, opts) => {
                 const [dir, file] = inner.split("/")
 
                 const details = parseFileName(file)
                 const href = `/${dir}/${details.name}`
 
-                return `<a href="${href}">${inner}</a>`
+                return `<a href="${href}">${displayName}</a>`
             },
         },
     ]
 })
-
 // "{{id}}-{{format-date now '%Y-%m-%d'}}-{{slug title}}"
 const parseFileName = (noteName) => {
     const [id, y, m, d, ...parts] = noteName.split("-")
@@ -57,6 +64,21 @@ function stripFrontmatter(markdown) {
     const frontmatterRegex = /^---\s*[\s\S]*?\s*---(?=\n|$)/
     return markdown.replace(frontmatterRegex, "").trim()
 }
+
+const searchNotes = (query) => {}
+
+app.get("/search", (req, res) => {
+    res.send(
+        precompiledSearch({
+            results: [
+                {
+                    name: "test",
+                    path: "foo/test",
+                },
+            ],
+        })
+    )
+})
 
 app.get("/:dir/:noteName", (req, res) => {
     const { dir, noteName } = req.params
@@ -99,21 +121,12 @@ app.get("/:dir", (req, res) => {
 })
 
 app.get("/", (req, res) => {
-    const { dir } = req.params
+    // const fileNames = fs
+    //     .readdirSync(path.join(root))
+    //     .filter((f) => !f.startsWith("."))
+    // console.log(fileNames)
 
-    const fileNames = fs
-        .readdirSync(path.join(root))
-        .filter((f) => !f.startsWith("."))
-    console.log(fileNames)
-
-    res.send(
-        precompliedDir({
-            files: fileNames.map((f) => ({
-                name: f,
-            })),
-            dir,
-        })
-    )
+    res.sendFile(path.resolve("./homepage.html"))
 })
 
 app.listen(port, () => {
