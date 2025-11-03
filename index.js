@@ -4,11 +4,16 @@ import path from "path"
 import { format } from "date-fns"
 import showdown from "showdown"
 import Handlebars from "handlebars"
-import { match } from "assert"
+import assert from "assert"
+import { dbInit, searchNotes } from "./db.js"
 
 const app = express()
 const port = 3000
 const root = "/Users/antonio/school/"
+const db = dbInit(path.join(root, ".zk/notebook.db"))
+console.log("this is the db", db)
+
+assert(!!db, "db is null")
 
 const templateFile = fs.readFileSync(path.join(process.cwd(), "template.html"))
 const precomplied = Handlebars.compile(templateFile.toString("utf8"))
@@ -65,20 +70,33 @@ function stripFrontmatter(markdown) {
     return markdown.replace(frontmatterRegex, "").trim()
 }
 
-const searchNotes = (query) => {}
-
 app.get("/search", (req, res) => {
+    const query = req.query.query
+
+    const searchResults = searchNotes(db, query).map((r) =>
+        parseNotePath(r.path)
+    )
+    console.log(searchResults)
+
     res.send(
         precompiledSearch({
-            results: [
-                {
-                    name: "test",
-                    path: "foo/test",
-                },
-            ],
+            results: searchResults.map((r) => ({
+                path: r.dir + "/" + r.note.name,
+                title: r.note.name,
+            })),
         })
     )
 })
+
+const parseNotePath = (path) => {
+    // 50008-Switching-and-Logic-Design/b5fc-2025-11-02-bases.md
+    const [dir, note] = path.split("/")
+
+    return {
+        dir,
+        note: parseFileName(note),
+    }
+}
 
 app.get("/:dir/:noteName", (req, res) => {
     const { dir, noteName } = req.params
