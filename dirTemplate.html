@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body>
+  <main>
+    <h2>{{dir}}</h2>
+    <ul>
+      {{#each files}}
+      <li><a href="{{this.path}}">{{this.name}}</a></li>
+      {{/each}}
+    </ul>
+  </main>
+</body>
+
+</html>

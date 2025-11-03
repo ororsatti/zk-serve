@@ -3,10 +3,19 @@ import fs from "fs"
 import path from "path"
 import { format } from "date-fns"
 import showdown from "showdown"
+import Handlebars from "handlebars"
 
 const app = express()
 const port = 3000
 const root = "/Users/antonio/school/"
+
+const templateFile = fs.readFileSync(path.join(process.cwd(), "template.html"))
+const precomplied = Handlebars.compile(templateFile.toString("utf8"))
+
+const dirTemplateFile = fs.readFileSync(
+    path.join(process.cwd(), "dirTemplate.html")
+)
+const precompliedDir = Handlebars.compile(dirTemplateFile.toString("utf8"))
 
 showdown.extension("wikilinks", function () {
     return [
@@ -57,8 +66,9 @@ app.get("/:dir/:noteName", (req, res) => {
 
     const noteDetails = details.find((d) => d.name === noteName)
     if (!noteDetails) {
-        res.status(404)
-        res.send(`Can not find path: ${dir}/${noteName}\n`)
+        // res.status(404)
+        // res.send(`Can not find path: ${dir}/${noteName}\n`)
+        res.sendFile(path.join(root, dir, noteName))
         return
     }
 
@@ -68,15 +78,43 @@ app.get("/:dir/:noteName", (req, res) => {
     const converter = new showdown.Converter({ extensions: ["wikilinks"] })
     const html = converter.makeHtml(stripFrontmatter(data.toString()))
 
-    res.send(html)
+    res.send(precomplied({ content: html }))
+})
+
+app.get("/:dir", (req, res) => {
+    const { dir } = req.params
+
+    const fileNames = fs.readdirSync(path.join(root, dir))
+    const files = fileNames.map(parseFileName).filter((f) => f.ext === "md")
+
+    res.send(
+        precompliedDir({
+            files: files.map((f) => ({
+                name: f.name,
+                path: path.join(dir, f.name),
+            })),
+            dir,
+        })
+    )
 })
 
 app.get("/", (req, res) => {
-    console.log(showdown.getAllExtensions())
-    res.send("Hello World!")
-})
+    const { dir } = req.params
 
-app.use(express.static(path.join(root, "public")))
+    const fileNames = fs
+        .readdirSync(path.join(root))
+        .filter((f) => !f.startsWith("."))
+    console.log(fileNames)
+
+    res.send(
+        precompliedDir({
+            files: fileNames.map((f) => ({
+                name: f,
+            })),
+            dir,
+        })
+    )
+})
 
 app.listen(port, () => {
     console.log(`Example app listening on port ${port}`)
