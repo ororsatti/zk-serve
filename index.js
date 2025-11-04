@@ -6,6 +6,7 @@ import showdown from "showdown"
 import Handlebars from "handlebars"
 import assert from "assert"
 import { dbInit, searchNotes } from "./db.js"
+import "showdown-youtube"
 
 const app = express()
 const port = 3000
@@ -115,7 +116,9 @@ app.get("/:dir/:noteName", (req, res) => {
     const data = fs.readFileSync(path.join(root, dir, noteDetails.getPath()), {
         encoding: "utf-8",
     })
-    const converter = new showdown.Converter({ extensions: ["wikilinks"] })
+    const converter = new showdown.Converter({
+        extensions: ["wikilinks", "youtube"],
+    })
     const html = converter.makeHtml(stripFrontmatter(data.toString()))
 
     res.send(precomplied({ content: html }))
