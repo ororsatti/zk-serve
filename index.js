@@ -4,17 +4,12 @@ import path from "path"
 import { format } from "date-fns"
 import showdown from "showdown"
 import Handlebars from "handlebars"
-import assert from "assert"
-import { dbInit, searchNotes } from "./db.js"
 import "showdown-youtube"
+import { ZK } from "./external/zk.js"
 
 const app = express()
 const port = 3000
 const root = "/Users/antonio/school/"
-const db = dbInit(path.join(root, ".zk/notebook.db"))
-console.log("this is the db", db)
-
-assert(!!db, "db is null")
 
 const templateFile = fs.readFileSync(path.join(process.cwd(), "template.html"))
 const precomplied = Handlebars.compile(templateFile.toString("utf8"))
@@ -31,12 +26,12 @@ const dirTemplateFile = fs.readFileSync(
 )
 const precompliedDir = Handlebars.compile(dirTemplateFile.toString("utf8"))
 
-const test = showdown.extension("wikilinks", function () {
+showdown.extension("wikilinks", function () {
     return [
         {
             type: "lang",
             regex: /\[\[([^\|\]]+)(?:\|(.*?))?\]\]/,
-            replace: (text, inner, displayName, opts) => {
+            replace: (_text, inner, displayName, _opts) => {
                 const [dir, file] = inner.split("/")
 
                 const details = parseFileName(file)
@@ -47,8 +42,10 @@ const test = showdown.extension("wikilinks", function () {
         },
     ]
 })
-// "{{id}}-{{format-date now '%Y-%m-%d'}}-{{slug title}}"
+
+// TODO: GET RID OF THIS FUNCTION!!
 const parseFileName = (noteName) => {
+    // "{{id}}-{{format-date now '%Y-%m-%d'}}-{{slug title}}"
     const [id, y, m, d, ...parts] = noteName.split("-")
     const [name, ext] = parts.join("-").split(".")
 
@@ -71,60 +68,41 @@ function stripFrontmatter(markdown) {
     return markdown.replace(frontmatterRegex, "").trim()
 }
 
-app.get("/search", (req, res) => {
+app.get("/notes/search", async (req, res) => {
     const query = req.query.query
 
-    const searchResults = searchNotes(db, query).map((r) =>
-        parseNotePath(r.path)
-    )
-    console.log(searchResults)
+    const zk = new ZK(root)
+    const results = await zk.search(query)
 
     res.send(
         precompiledSearch({
-            results: searchResults.map((r) => ({
-                path: r.dir + "/" + r.note.name,
-                title: r.note.name,
-            })),
+            results,
         })
     )
 })
 
-const parseNotePath = (path) => {
-    // 50008-Switching-and-Logic-Design/b5fc-2025-11-02-bases.md
-    const [dir, note] = path.split("/")
-
-    return {
-        dir,
-        note: parseFileName(note),
-    }
-}
-
-app.get("/:dir/:noteName", (req, res) => {
+app.get("/notes/:dir/:noteName", async (req, res) => {
     const { dir, noteName } = req.params
+    const p = [dir, noteName].join("/")
 
-    const files = fs.readdirSync(path.join(root, dir))
-    const details = files.map(parseFileName)
+    const zk = new ZK(root)
 
-    const noteDetails = details.find((d) => d.name === noteName)
-    if (!noteDetails) {
-        // res.status(404)
-        // res.send(`Can not find path: ${dir}/${noteName}\n`)
-        res.sendFile(path.join(root, dir, noteName))
+    const note = await zk.getNote(p)
+    if (!note) {
+        res.status(404)
+        res.send(`Can not find path: ${dir}/${noteName}\n`)
         return
     }
 
-    const data = fs.readFileSync(path.join(root, dir, noteDetails.getPath()), {
-        encoding: "utf-8",
-    })
     const converter = new showdown.Converter({
         extensions: ["wikilinks", "youtube"],
     })
-    const html = converter.makeHtml(stripFrontmatter(data.toString()))
+    const html = converter.makeHtml(stripFrontmatter(note.content))
 
     res.send(precomplied({ content: html }))
 })
 
-app.get("/:dir", (req, res) => {
+app.get("/notes/:dir", (req, res) => {
     const { dir } = req.params
 
     const fileNames = fs.readdirSync(path.join(root, dir))
@@ -142,13 +120,10 @@ app.get("/:dir", (req, res) => {
 })
 
 app.get("/", (req, res) => {
-    // const fileNames = fs
-    //     .readdirSync(path.join(root))
-    //     .filter((f) => !f.startsWith("."))
-    // console.log(fileNames)
-
     res.sendFile(path.resolve("./homepage.html"))
 })
+
+app.get(express.static("public"))
 
 app.listen(port, () => {
     console.log(`Example app listening on port ${port}`)
